@@ -32,6 +32,11 @@ struct PyParsedMail {
 }
 
 
+#[pymethods]
+impl PyParsedMail {
+
+}
+
 #[pyfunction]
 fn parse_mail<'a>(py: Python<'a>, buf: &[u8]) -> PyResult<PyParsedMail>
 {
@@ -46,7 +51,7 @@ fn parse_mail<'a>(py: Python<'a>, buf: &[u8]) -> PyResult<PyParsedMail>
 
     match &*pm.ha {
         Ok(_) => Ok(pm),
-        Err(error) => Err(PyZeroDivisionError::new_err("division by zero"))
+        Err(error) => Err(ParseError::new_err(error.to_string()))
     }
 }
 
