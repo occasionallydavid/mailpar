@@ -1,10 +1,6 @@
-#[allow(unused_imports)]
 use pyo3::prelude::*;
-#[allow(unused_imports)]
 use pyo3::types::*;
-#[allow(unused_imports)]
 use owning_ref::OwningHandle;
-#[allow(unused_imports)]
 use std::rc::Rc;
 use std::collections::BTreeMap;
 use mailparse::body::Body::Binary;
@@ -12,6 +8,10 @@ use mailparse::body::Body::Base64;
 use mailparse::body::Body::QuotedPrintable;
 use mailparse::body::Body::SevenBit;
 use mailparse::body::Body::EightBit;
+use mailparse::DispositionType::Extension;
+use mailparse::DispositionType::FormData;
+use mailparse::DispositionType::Attachment;
+use mailparse::DispositionType::Inline;
 
 use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyIndexError;
@@ -58,6 +58,7 @@ struct PyHeaders {
 
 #[pymethods]
 impl PyHeaders {
+
 }
 
 
@@ -82,6 +83,19 @@ impl PyParsedMail {
         slice_offset(handle.as_owner().as_slice(), _part(self).raw_bytes)
     }
 
+    fn raw_bytes(&self, py: Python) -> PyObject {
+        PyBytes::new(py, _part(self).raw_bytes).into()
+    }
+
+    fn raw_body_offset(&self, py: Python) -> usize {
+        let handle = &(self.storage.handle);
+        slice_offset(handle.as_owner().as_slice(), self._body_encoded())
+    }
+
+    fn raw_body_length(&self, py: Python) -> usize {
+        self._body_encoded().len()
+    }
+
     fn subpart_count(&self) -> usize {
         _part(self).subparts.len()
     }
@@ -100,6 +114,15 @@ impl PyParsedMail {
 
     fn param(&self, k: &str) -> Option<&String> {
         _part(self).ctype.params.get(k)
+    }
+
+    fn content_disposition(&self) -> String {
+        match _part(self).get_content_disposition().disposition {
+            Inline => "inline".to_string(),
+            Attachment => "attachment".to_string(),
+            FormData => "formdata".to_string(),
+            Extension(s) => s,
+        }
     }
 
     fn path(&self) -> Vec<usize> {
@@ -139,15 +162,18 @@ impl PyParsedMail {
         }
     }
 
-    fn get_body_encoded(&self, py: Python) -> PyResult<PyObject> {
-        let s = match _part(self).get_body_encoded() {
+    fn _body_encoded(&self) -> &[u8] {
+        match _part(self).get_body_encoded() {
             Base64(eb) => eb.get_raw(),
             QuotedPrintable(eb) => eb.get_raw(),
             SevenBit(tb) => tb.get_raw(),
             EightBit(tb) => tb.get_raw(),
             Binary(bb) => bb.get_raw(),
-        };
+        }
+    }
 
+    fn get_body_encoded(&self, py: Python) -> PyResult<PyObject> {
+        let s = self._body_encoded();
         Ok(PyBytes::new(py, s).into())
     }
 }
