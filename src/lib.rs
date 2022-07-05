@@ -1,24 +1,24 @@
-use pyo3::prelude::*;
-use pyo3::types::*;
-use owning_ref::OwningHandle;
-use std::rc::Rc;
 use std::collections::BTreeMap;
-use mailparse::body::Body::Binary;
+use std::rc::Rc;
+
 use mailparse::body::Body::Base64;
+use mailparse::body::Body::Binary;
+use mailparse::body::Body::EightBit;
 use mailparse::body::Body::QuotedPrintable;
 use mailparse::body::Body::SevenBit;
-use mailparse::body::Body::EightBit;
+use mailparse::DispositionType::Attachment;
 use mailparse::DispositionType::Extension;
 use mailparse::DispositionType::FormData;
-use mailparse::DispositionType::Attachment;
 use mailparse::DispositionType::Inline;
-
+use mailparse::MailHeaderMap;
+use owning_ref::OwningHandle;
+use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyIndexError;
-use pyo3::create_exception;
+use pyo3::prelude::*;
+use pyo3::types::*;
 
 use mailparse;
-
 
 
 create_exception!(mailpar, ParseError, PyException);
@@ -58,7 +58,41 @@ struct PyHeaders {
 
 #[pymethods]
 impl PyHeaders {
+    fn offset(&self) -> [usize; 2] {
+        let handle = &(self.storage.handle);
+        let sl = self.raw_bytes();
+        return [slice_offset(handle.as_owner().as_slice(), sl), sl.len()];
+    }
 
+    fn raw_bytes(&self) -> &[u8] {
+        let headers = _hpart(self).get_headers();
+        headers.get_raw_bytes()
+    }
+
+    fn first(&self, key: &str) -> Option<String> {
+        let headers = _hpart(self).get_headers();
+        headers.get_first_value(key)
+    }
+
+    fn all(&self, key: &str) -> Vec<String> {
+        let headers = _hpart(self).get_headers();
+        headers.get_all_values(key)
+    }
+}
+
+
+fn _hpart<'a>(parsed: &'a PyHeaders) -> &'a mailparse::ParsedMail<'a>
+{
+    let handle = &(parsed.storage.handle);
+    let result = &*handle;
+
+    let mut part = result.as_ref().unwrap();
+    for i in &parsed.path {
+        //println!("EEK {}", i);
+        part = &(part.subparts[*i]);
+    }
+
+    part
 }
 
 
@@ -78,22 +112,20 @@ fn _part<'a>(parsed: &'a PyParsedMail) -> &'a mailparse::ParsedMail<'a>
 
 #[pymethods]
 impl PyParsedMail {
-    fn raw_byte_offset(&self) -> usize {
+    fn offset(&self) -> [usize; 2] {
         let handle = &(self.storage.handle);
-        slice_offset(handle.as_owner().as_slice(), _part(self).raw_bytes)
+        let sl = _part(self).raw_bytes;
+        return [slice_offset(handle.as_owner().as_slice(), sl), sl.len()];
     }
 
     fn raw_bytes(&self, py: Python) -> PyObject {
         PyBytes::new(py, _part(self).raw_bytes).into()
     }
 
-    fn raw_body_offset(&self, py: Python) -> usize {
+    fn body_offset(&self, py: Python) -> [usize; 2] {
         let handle = &(self.storage.handle);
-        slice_offset(handle.as_owner().as_slice(), self._body_encoded())
-    }
-
-    fn raw_body_length(&self, py: Python) -> usize {
-        self._body_encoded().len()
+        let sl = self.body_encoded();
+        return [slice_offset(handle.as_owner().as_slice(), sl), sl.len()];
     }
 
     fn subpart_count(&self) -> usize {
@@ -148,21 +180,21 @@ impl PyParsedMail {
         })
     }
 
-    fn get_body(&self) -> PyResult<String> {
+    fn body(&self) -> PyResult<String> {
         match _part(self).get_body() {
             Ok(s) => Ok(s),
             Err(e) => Err(ParseError::new_err(e.to_string()))
         }
     }
 
-    fn get_body_raw(&self, py: Python) -> PyResult<PyObject> {
+    fn body_raw(&self, py: Python) -> PyResult<PyObject> {
         match _part(self).get_body_raw() {
             Ok(s) => Ok(PyBytes::new(py, s.as_slice()).into()),
             Err(e) => Err(ParseError::new_err(e.to_string()))
         }
     }
 
-    fn _body_encoded(&self) -> &[u8] {
+    fn body_encoded(&self) -> &[u8] {
         match _part(self).get_body_encoded() {
             Base64(eb) => eb.get_raw(),
             QuotedPrintable(eb) => eb.get_raw(),
@@ -170,11 +202,6 @@ impl PyParsedMail {
             EightBit(tb) => tb.get_raw(),
             Binary(bb) => bb.get_raw(),
         }
-    }
-
-    fn get_body_encoded(&self, py: Python) -> PyResult<PyObject> {
-        let s = self._body_encoded();
-        Ok(PyBytes::new(py, s).into())
     }
 }
 
