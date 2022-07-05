@@ -17,6 +17,7 @@ def p(part):
     pp('content_disposition():', part.content_disposition())
     pp('subpart_count():', part.subpart_count())
     pp('body():', repr(part.body()[:25]))
+    pp('body_encoding():', part.body_encoding())
     pp('body_raw():', repr(part.body_raw()[:25]))
     pp('body_encoded():', repr(part.body_encoded()[:25]))
     pp('headers.offset():', part.headers().offset())
@@ -29,5 +30,5 @@ def p(part):
 
 
 s = open('/tmp/foo.mbox', 'rb').read()
-msg = mailpar.parse_mail(s)
+msg = mailpar.from_bytes(s)
 p(msg)

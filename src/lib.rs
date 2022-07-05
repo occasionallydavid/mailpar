@@ -157,6 +157,13 @@ impl PyParsedMail {
         }
     }
 
+    fn get_filename(&self) -> Option<String> {
+        match _part(self).get_content_disposition().params.get("filename") {
+            Some(s) => Some(s.clone()),
+            None => None
+        }
+    }
+
     fn path(&self) -> Vec<usize> {
         self.path.clone()
     }
@@ -194,6 +201,16 @@ impl PyParsedMail {
         }
     }
 
+    fn body_encoding(&self) -> &str {
+        match _part(self).get_body_encoded() {
+            Base64(_) => "base64",
+            QuotedPrintable(_) => "quotedprintable",
+            SevenBit(_) => "7bit",
+            EightBit(_) => "8bit",
+            Binary(_) => "binary",
+        }
+    }
+
     fn body_encoded(&self) -> &[u8] {
         match _part(self).get_body_encoded() {
             Base64(eb) => eb.get_raw(),
@@ -214,7 +231,7 @@ fn _subpath(path: &Vec<usize>, i: usize) -> Vec<usize> {
 
 
 #[pyfunction]
-fn parse_mail<'a>(_py: Python<'a>, buf: &[u8]) -> PyResult<PyParsedMail>
+fn from_bytes<'a>(_py: Python<'a>, buf: &[u8]) -> PyResult<PyParsedMail>
 {
     let handle = OwningHandle::new_with_fn(
         Box::new(buf.to_vec()),
@@ -241,7 +258,7 @@ fn parse_mail<'a>(_py: Python<'a>, buf: &[u8]) -> PyResult<PyParsedMail>
 
 #[pymodule]
 fn mailpar(py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(parse_mail, m)?)?;
+    m.add_function(wrap_pyfunction!(from_bytes, m)?)?;
     m.add_class::<PyParsedMail>()?;
     m.add_class::<PyHeaders>()?;
     m.add("ParseError", py.get_type::<ParseError>())?;
