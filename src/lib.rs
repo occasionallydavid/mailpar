@@ -160,7 +160,10 @@ impl PyParsedMail {
     fn get_filename(&self) -> Option<String> {
         match _part(self).get_content_disposition().params.get("filename") {
             Some(s) => Some(s.clone()),
-            None => None
+            None => match _part(self).ctype.params.get("name") {
+                Some(s) => Some(s.clone()),
+                None => None
+            }
         }
     }
 
