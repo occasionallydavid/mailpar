@@ -74,6 +74,28 @@ impl PyHeaders {
         headers.get_first_value(key)
     }
 
+    //fn first_address(&self, key: &str) -> Option<String> {
+    fn first_address(&self, py: Python, key: &str) -> PyObject {
+        //use mailparse::{addrparse_header, parse_mail, MailAddr, MailHeaderMap, SingleInfo};
+        let headers = _hpart(self).get_headers();
+        match &mailparse::addrparse_header(
+            headers.get_first_header(key).unwrap()
+        ).unwrap()[0] {
+            mailparse::MailAddr::Single(info) => {
+                let dct = pyo3::types::PyDict::new(py);
+                dct.set_item("addr", info.addr.as_str());
+
+                match &info.display_name {
+                    None => dct.set_item("display_name", ""), // None
+                    Some(s) => dct.set_item("display_name", s.as_str()),
+                };
+
+                dct.into()
+            }
+            _ => panic!()
+        }
+    }
+
     fn all(&self, key: &str) -> Vec<String> {
         let headers = _hpart(self).get_headers();
         headers.get_all_values(key)
