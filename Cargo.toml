@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 html-escape = "0.2.13"
+lazy_static = "1.4.0"
 lol_html = "0.4.0"
 mailparse = "0.13.8"
 owning_ref = "0.4.1"

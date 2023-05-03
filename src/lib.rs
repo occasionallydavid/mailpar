@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+#[macro_use]
+extern crate lazy_static;
+
 use mailparse::body::Body::Base64;
 use mailparse::body::Body::Binary;
 use mailparse::body::Body::EightBit;

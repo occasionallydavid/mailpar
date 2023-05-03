@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::cell::RefCell;
 
 use lol_html::html_content::Element;
 use lol_html::{element, Settings};
@@ -35,15 +36,18 @@ pub struct Output {
 }
 
 
+lazy_static! {
+    static ref permitted_html_tags: HashSet<&'static str> = {
+        HashSet::from_iter(PERMITTED_HTML_TAGS.split(' '))
+    };
+
+    static ref permitted_html_attrs: HashSet<&'static str> = {
+        HashSet::from_iter(PERMITTED_HTML_ATTRS.split(' '))
+    };
+}
+
+
 pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError> {
-    let permitted_html_tags: HashSet<&str> = HashSet::from_iter(
-        PERMITTED_HTML_TAGS.split(' ')
-    );
-
-    let permitted_html_attrs: HashSet<&str> = HashSet::from_iter(
-        PERMITTED_HTML_ATTRS.split(' ')
-    );
-
     let mut style_links = Vec::new();
     let mut style_attrs = Vec::new();
     let mut sources = Vec::new();
@@ -51,7 +55,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
     let mut inline_styles = Vec::new();
 
     let mut inline_style = String::new();
-    let mut text_content = String::new();
+    let mut text_content = RefCell::new(String::new());
     let mut page_links = Vec::new();
 
     let defer = |d: &mut Vec<Deferral>, kind, data| {
@@ -197,13 +201,18 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 Ok(())
             }),
 
+            element!("br", |elem| {
+                text_content.borrow_mut().push('\n');
+                Ok(())
+            }),
+
             lol_html::text!("*", |text| {
-                if text.text_type() ==  lol_html::html_content::TextType::Data && !text.removed() {
+                if text.text_type() == lol_html::html_content::TextType::Data && !text.removed() {
                     if text.as_str().len() > 0 {
-                        if text_content.len() != 0 {
-                            text_content.push(' ');
+                        if (*text_content.borrow()).len() != 0 {
+                            //text_content.push(' ');
                         }
-                        text_content += text.as_str();
+                        (*text_content.borrow_mut()) += text.as_str();
                     }
                 }
                 Ok(())
@@ -244,7 +253,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
         Ok(s) => {
             let mut text = String::new();
             html_escape::decode_html_entities_to_string(
-                text_content.as_str(),
+                text_content.into_inner().as_str(),
                 &mut text
             );
 
