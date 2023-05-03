@@ -20,6 +20,8 @@ use pyo3::types::*;
 
 use mailparse;
 
+pub mod html;
+
 
 create_exception!(mailpar, ParseError, PyException);
 
@@ -93,9 +95,9 @@ impl PyHeaders {
                         Some(s) => s.as_str(),
                     };
 
-                    lst.append((name, info.addr.as_str()));
+                    lst.append((name, info.addr.as_str())).expect("append to list");
                 },
-                None => {},
+                //None => {},
                 _ => panic!()
             }
         }
@@ -151,7 +153,7 @@ impl PyParsedMail {
         PyBytes::new(py, _part(self).raw_bytes).into()
     }
 
-    fn body_offset(&self, py: Python) -> [usize; 2] {
+    fn body_offset(&self) -> [usize; 2] {
         let handle = &(self.storage.handle);
         let sl = self.body_encoded();
         return [slice_offset(handle.as_owner().as_slice(), sl), sl.len()];
@@ -288,9 +290,35 @@ fn from_bytes<'a>(_py: Python<'a>, buf: &[u8]) -> PyResult<PyParsedMail>
 }
 
 
+#[pyfunction]
+pub fn rewrite_html(py: Python, s: &str) -> PyResult<PyObject>
+{
+    let lst = pyo3::types::PyList::empty(py);
+
+    match crate::html::rewrite_html(s) {
+        Ok(output) => {
+            for deferral in output.deferrals {
+                //lst.append((name, info.addr.as_str())).expect("append to list");
+                lst.append((deferral.i, deferral.kind as i32, deferral.data));
+            }
+
+            let dct = pyo3::types::PyDict::new(py);
+            dct.set_item("html", output.html);
+            dct.set_item("page_links", output.page_links);
+            dct.set_item("text_content", output.text_content);
+            dct.set_item("deferrals", lst);
+            Ok(dct.into())
+            //Ok((output.html, lst).into(py))
+        },
+        Err(_) => panic!(),
+    }
+}
+
+
 #[pymodule]
 fn mailpar(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(from_bytes, m)?)?;
+    m.add_function(wrap_pyfunction!(rewrite_html, m)?)?;
     m.add_class::<PyParsedMail>()?;
     m.add_class::<PyHeaders>()?;
     m.add("ParseError", py.get_type::<ParseError>())?;

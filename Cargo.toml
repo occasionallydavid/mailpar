@@ -9,6 +9,8 @@ name = "mailpar"
 crate-type = ["cdylib"]
 
 [dependencies]
+html-escape = "0.2.13"
+lol_html = "0.4.0"
 mailparse = "0.13.8"
 owning_ref = "0.4.1"
 pyo3 = { version = "0.16.5", features = ["extension-module"] }
