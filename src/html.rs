@@ -1,14 +1,13 @@
 use std::collections::HashSet;
 use std::cell::RefCell;
 
-use lol_html::html_content::Element;
 use lol_html::{element, Settings};
 
 
-const PERMITTED_HTML_TAGS: &str = "link html head style body a abbr acronym address area b bdo big blockquote br button caption center cite code col colgroup dd del dfn dir div dl dt em fieldset font form h1 h2 h3 h4 h5 h6 hr i img input ins kbd label legend li map menu ol optgroup option p pre q s samp select small span strike strong sub sup table tbody td textarea tfoot th thead u tr tt u ul var";
+const PERMITTED_HTML_TAGS_: &str = "link html head style body a abbr acronym address area b bdo big blockquote br button caption center cite code col colgroup dd del dfn dir div dl dt em fieldset font form h1 h2 h3 h4 h5 h6 hr i img input ins kbd label legend li map menu ol optgroup option p pre q s samp select small span strike strong sub sup table tbody td textarea tfoot th thead u tr tt u ul var";
 
 
-const PERMITTED_HTML_ATTRS: &str = "align alt aria-hidden aria-label bgcolor border cellpadding cellspacing class color colspan dir height hspace id lang rel href role src style type valign vspace width background";
+const PERMITTED_HTML_ATTRS_: &str = "align alt aria-hidden aria-label bgcolor border cellpadding cellspacing class color colspan dir height hspace id lang rel href role src style type valign vspace width background";
 
 
 #[derive(Debug)]
@@ -37,12 +36,12 @@ pub struct Output {
 
 
 lazy_static! {
-    static ref permitted_html_tags: HashSet<&'static str> = {
-        HashSet::from_iter(PERMITTED_HTML_TAGS.split(' '))
+    static ref PERMITTED_HTML_TAGS: HashSet<&'static str> = {
+        HashSet::from_iter(PERMITTED_HTML_TAGS_.split(' '))
     };
 
-    static ref permitted_html_attrs: HashSet<&'static str> = {
-        HashSet::from_iter(PERMITTED_HTML_ATTRS.split(' '))
+    static ref PERMITTED_HTML_ATTRS: HashSet<&'static str> = {
+        HashSet::from_iter(PERMITTED_HTML_ATTRS_.split(' '))
     };
 }
 
@@ -55,7 +54,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
     let mut inline_styles = Vec::new();
 
     let mut inline_style = String::new();
-    let mut text_content = RefCell::new(String::new());
+    let text_content = RefCell::new(String::new());
     let mut page_links = Vec::new();
 
     let defer = |d: &mut Vec<Deferral>, kind, data| {
@@ -101,7 +100,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
 
             // Strip invalid elems
             element!("*", |elem| {
-                if !permitted_html_tags.contains(elem.tag_name().as_str()) {
+                if !PERMITTED_HTML_TAGS.contains(elem.tag_name().as_str()) {
                     //println!("REMOVE BAD TAG: {}", elem.tag_name());
                     elem.remove_and_keep_content();
                     return Ok(());
@@ -110,7 +109,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 let mut v = Vec::new();
                 for attr in elem.attributes() {
                     let name = attr.name();
-                    if !permitted_html_attrs.contains(name.as_str()) {
+                    if !PERMITTED_HTML_ATTRS.contains(name.as_str()) {
                         v.push(name);
                     }
                 }
@@ -169,6 +168,9 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 let data = html_escape::decode_html_entities(
                     elem.get_attribute("style").unwrap().as_str()
                 ).into_owned();
+                //let data = htmlize::unescape(
+                    //elem.get_attribute("style").unwrap().as_str()
+                //).into_owned();
 
                 elem.set_attribute(
                     "style",
@@ -201,18 +203,17 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 Ok(())
             }),
 
-            element!("br", |elem| {
+            element!("br", |_elem| {
                 text_content.borrow_mut().push('\n');
                 Ok(())
             }),
 
             lol_html::text!("*", |text| {
                 if text.text_type() == lol_html::html_content::TextType::Data && !text.removed() {
-                    if text.as_str().len() > 0 {
-                        if (*text_content.borrow()).len() != 0 {
-                            //text_content.push(' ');
-                        }
-                        (*text_content.borrow_mut()) += text.as_str();
+                    let s = text.as_str().trim();
+                    if s.len() > 0 {
+                        (*text_content.borrow_mut()) += s;
+                        (*text_content.borrow_mut()) += " ";
                     }
                 }
                 Ok(())

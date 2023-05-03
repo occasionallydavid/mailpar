@@ -24,6 +24,7 @@ use pyo3::types::*;
 use mailparse;
 
 pub mod html;
+pub mod css;
 
 
 create_exception!(mailpar, ParseError, PyException);
@@ -318,10 +319,18 @@ pub fn rewrite_html(py: Python, s: &str) -> PyResult<PyObject>
 }
 
 
+#[pyfunction]
+pub fn rewrite_css(py: Python, s: &str) -> PyResult<PyObject>
+{
+    Ok(PyString::new(py, crate::css::rewrite_css(s).as_str()).into())
+}
+
+
 #[pymodule]
 fn mailpar(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(from_bytes, m)?)?;
     m.add_function(wrap_pyfunction!(rewrite_html, m)?)?;
+    m.add_function(wrap_pyfunction!(rewrite_css, m)?)?;
     m.add_class::<PyParsedMail>()?;
     m.add_class::<PyHeaders>()?;
     m.add("ParseError", py.get_type::<ParseError>())?;
