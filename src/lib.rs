@@ -75,25 +75,32 @@ impl PyHeaders {
     }
 
     //fn first_address(&self, key: &str) -> Option<String> {
-    fn first_address(&self, py: Python, key: &str) -> PyObject {
-        //use mailparse::{addrparse_header, parse_mail, MailAddr, MailHeaderMap, SingleInfo};
+    fn first_address(&self, py: Python, key: &str) -> PyResult<PyObject> {
         let headers = _hpart(self).get_headers();
-        match &mailparse::addrparse_header(
+        let addrs = match mailparse::addrparse_header(
             headers.get_first_header(key).unwrap()
-        ).unwrap()[0] {
-            mailparse::MailAddr::Single(info) => {
-                let dct = pyo3::types::PyDict::new(py);
-                dct.set_item("addr", info.addr.as_str());
+        ) {
+            Err(e) => return Err(ParseError::new_err(e.to_string())),
+            Ok(addrs) => addrs
+        };
 
-                match &info.display_name {
-                    None => dct.set_item("display_name", ""), // None
-                    Some(s) => dct.set_item("display_name", s.as_str()),
-                };
+        let lst = pyo3::types::PyList::empty(py);
+        for addr in &addrs.into_inner() {
+            match &addr {
+                mailparse::MailAddr::Single(info) => {
+                    let name = match &info.display_name {
+                        None => "",
+                        Some(s) => s.as_str(),
+                    };
 
-                dct.into()
+                    lst.append((name, info.addr.as_str()));
+                },
+                None => {},
+                _ => panic!()
             }
-            _ => panic!()
         }
+
+        Ok(lst.into())
     }
 
     fn all(&self, key: &str) -> Vec<String> {
