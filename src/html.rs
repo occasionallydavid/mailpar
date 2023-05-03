@@ -14,6 +14,7 @@ const PERMITTED_HTML_ATTRS: &str = "align alt aria-hidden aria-label bgcolor bor
 pub enum DeferralKind {
     StyleLink,
     StyleInline,
+    StyleAttr,
     Source,
     ImageLink,
 }
@@ -44,6 +45,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
     );
 
     let mut style_links = Vec::new();
+    let mut style_attrs = Vec::new();
     let mut sources = Vec::new();
     let mut backgrounds = Vec::new();
     let mut inline_styles = Vec::new();
@@ -57,6 +59,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
         let s = match &kind {
             DeferralKind::StyleLink => "StyleLink",
             DeferralKind::StyleInline => "StyleInline",
+            DeferralKind::StyleAttr => "StyleAttr",
             DeferralKind::Source => "Source",
             DeferralKind::ImageLink => "ImageLink",
         };
@@ -95,7 +98,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
             // Strip invalid elems
             element!("*", |elem| {
                 if !permitted_html_tags.contains(elem.tag_name().as_str()) {
-                    println!("REMOVE BAD TAG: {}", elem.tag_name());
+                    //println!("REMOVE BAD TAG: {}", elem.tag_name());
                     elem.remove_and_keep_content();
                     return Ok(());
                 }
@@ -109,7 +112,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 }
 
                 for name in v {
-                    println!("REMOVE BAD ATTR: {}", name);
+                    //println!("REMOVE BAD ATTR: {}", name);
                     elem.remove_attribute(name.as_str());
                 }
 
@@ -120,13 +123,13 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
             element!("link", |elem| {
                 match elem.get_attribute("rel") {
                     None => {
-                        println!("drop <link> with no rel");
+                        //println!("drop <link> with no rel");
                         elem.remove();
                         return Ok(());
                     },
                     Some(rel) => {
                         if !rel.eq_ignore_ascii_case("stylesheet") {
-                            println!("drop non-style <link>: rel={}", rel);
+                            //println!("drop non-style <link>: rel={}", rel);
                             elem.remove();
                             return Ok(());
                         }
@@ -135,13 +138,13 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
 
                 let href = match elem.get_attribute("href") {
                     None => {
-                        println!("drop <link> with no href");
+                        //println!("drop <link> with no href");
                         elem.remove();
                         return Ok(());
                     },
                     Some(href) => {
                         if !href.starts_with("http") {
-                            println!("drop non-http <link>: href={}", href);
+                            //println!("drop non-http <link>: href={}", href);
                             elem.remove();
                             return Ok(());
                         }
@@ -153,6 +156,21 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                     defer(&mut style_links,
                           DeferralKind::StyleLink, href).as_str(),
                     lol_html::html_content::ContentType::Html
+                );
+
+                Ok(())
+            }),
+
+            element!("[style]", |elem| {
+                let data = html_escape::decode_html_entities(
+                    elem.get_attribute("style").unwrap().as_str()
+                ).into_owned();
+
+                elem.set_attribute(
+                    "style",
+                    defer(&mut style_attrs,
+                          DeferralKind::StyleAttr,
+                          data).as_str()
                 );
 
                 Ok(())
@@ -172,7 +190,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                     text.remove();
                     if text.last_in_text_node() {
                         inline_styles.last_mut().unwrap().data = inline_style.clone();
-                        println!("WTF {}", inline_style);
+                        //println!("WTF {}", inline_style);
                         inline_style.clear();
                     }
                 }
@@ -220,6 +238,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
     style_links.append(&mut sources);
     style_links.append(&mut backgrounds);
     style_links.append(&mut inline_styles);
+    style_links.append(&mut style_attrs);
 
     match result {
         Ok(s) => {
