@@ -95,19 +95,14 @@ pub fn is_image_url_prop(prop: &str) -> bool {
 fn _rewrite_css<'a>(state: &RefCell<State>, parser: &mut Parser)
     -> Result<(), ParseError<'a, String>>
 {
-    let ws = Token::WhiteSpace(" ");
-
     // https://github.com/Y2Z/monolith/blob/master/src/css.rs#L131
     loop {
-        let t = parser.next_including_whitespace();
-        match t {
+        match parser.next_including_whitespace() {
             Ok(token) => {
-                //let t2 = token.clone();
-                println!("TOKEN {:?}", token);
+                //println!("TOKEN {:?}", token);
                 match token {
                     Token::WhiteSpace(_) => {
-                        state.borrow_mut().push(&ws);
-                        continue;
+                        state.borrow_mut().pushstr(" ");
                     },
                     Token::UnquotedUrl(e) => {
                         let s = format!("url({})",
@@ -117,35 +112,33 @@ fn _rewrite_css<'a>(state: &RefCell<State>, parser: &mut Parser)
                             )
                         );
                         state.borrow_mut().pushstr(s.as_str());
-                        continue;
                     },
                     Token::Function(_) |
                     Token::ParenthesisBlock |
                     Token::SquareBracketBlock |
                     Token::CurlyBracketBlock => {
-                        let tc = token.clone();
-                        state.borrow_mut().push(&tc); // WHYYYYY
+                        state.borrow_mut().push(&token);
+                        let tc = token.clone(); // WHYYYYY
+
                         match parser.parse_nested_block(
                             |p| _rewrite_css(state, p)
                         ) {
                             Ok(s) => {},
                             Err(_) => break,
                         }
-                        state.borrow_mut().pushstr(match tc {
-                            Token::Function(_) => ")",
-                            Token::ParenthesisBlock => ")",
-                            Token::SquareBracketBlock => "}",
-                            _ => "}"
-                        });
-                        continue;
+                        state.borrow_mut().pushstr(
+                            match tc {
+                                Token::Function(_) => ")",
+                                Token::ParenthesisBlock => ")",
+                                Token::SquareBracketBlock => "}",
+                                _ => "}"
+                            }
+                        );
                     },
-                    _ => {},
+                    _ => state.borrow_mut().push(token)
                 };
-                //println!("EEK {:?}", token);
-                state.borrow_mut().push(token);
             },
-            Err(_) => {
-                //println!("DOINK {:?}", e);
+            Err(e) => {
                 break;
             }
         };
@@ -158,6 +151,8 @@ fn _rewrite_css<'a>(state: &RefCell<State>, parser: &mut Parser)
 pub fn rewrite_css(css: &str)
     -> Result<Output, ParseError<String>>
 {
+    let mut input = ParserInput::new(css);
+    let mut parser = Parser::new(&mut input);
     let state = RefCell::new(
         State {
             state: ParseState::Basic,
@@ -166,17 +161,14 @@ pub fn rewrite_css(css: &str)
         }
     );
 
-    let mut input = ParserInput::new(css);
-    let mut parser = Parser::new(&mut input);
-
     match _rewrite_css(&state, &mut parser) {
         Ok(_) => {
             let state_ = state.into_inner();
-            return Ok(Output {
+            Ok(Output {
                 css: state_.output,
                 deferrals: state_.deferrals,
             })
         },
-        Err(e) => return Err(e),
+        Err(e) => Err(e)
     }
 }
