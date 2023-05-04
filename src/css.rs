@@ -1,5 +1,4 @@
 use cssparser::{Parser, ParseError, ParserInput, ToCss, Token};
-use std::collections::HashSet;
 use std::cell::RefCell;
 
 
@@ -10,9 +9,8 @@ enum ParseState {
 }
 
 pub enum DeferralKind {
-    Import,
-    Font,
-    Image,
+    UnquotedUrl,
+    QuotedUrl,
 }
 
 pub struct Deferral {
@@ -44,9 +42,8 @@ impl State {
     fn defer(&mut self, kind: DeferralKind, data: String) -> String {
         let i = self.deferrals.len();
         let s = match &kind {
-            DeferralKind::Import => "Import",
-            DeferralKind::Font => "Font",
-            DeferralKind::Image => "Image",
+            DeferralKind::QuotedUrl => "QuotedUrl",
+            DeferralKind::UnquotedUrl => "UnquotedUrl",
         };
 
         self.deferrals.push(Deferral {
@@ -60,39 +57,27 @@ impl State {
 }
 
 
-lazy_static! {
-    static ref CSS_PROPS_WITH_IMAGE_URLS: HashSet<&'static str> = {
-        HashSet::from_iter([
-            // Universal
-            "background",
-            "background-image",
-            "border-image",
-            "border-image-source",
-            "content",
-            "cursor",
-            "list-style",
-            "list-style-image",
-            "mask",
-            "mask-image",
-            // Specific to @counter-style
-            "additive-symbols",
-            "negative",
-            "pad",
-            "prefix",
-            "suffix",
-            "symbols",
-        ])
-    };
+fn _do_block<'a>(in_url: bool,
+                 token: Token,
+                 state: &RefCell<State>,
+                 parser: &mut Parser)
+{
+    state.borrow_mut().push(&token);
+
+    parser.parse_nested_block(|p| _rewrite_css(in_url, state, p));
+
+    state.borrow_mut().pushstr(
+        match token {
+            Token::Function(_) => ")",
+            Token::ParenthesisBlock => ")",
+            Token::SquareBracketBlock => "}",
+            _ => "}"
+        }
+    );
 }
 
 
-pub fn is_image_url_prop(prop: &str) -> bool {
-    let lower = prop.to_lowercase();
-    CSS_PROPS_WITH_IMAGE_URLS.contains(lower.as_str())
-}
-
-
-fn _rewrite_css<'a>(state: &RefCell<State>, parser: &mut Parser)
+fn _rewrite_css<'a>(in_url: bool, state: &RefCell<State>, parser: &mut Parser)
     -> Result<(), ParseError<'a, String>>
 {
     // https://github.com/Y2Z/monolith/blob/master/src/css.rs#L131
@@ -101,44 +86,41 @@ fn _rewrite_css<'a>(state: &RefCell<State>, parser: &mut Parser)
             Ok(token) => {
                 //println!("TOKEN {:?}", token);
                 match token {
-                    Token::WhiteSpace(_) => {
-                        state.borrow_mut().pushstr(" ");
+                    Token::QuotedString(s) => {
+                        if !in_url {
+                            state.borrow_mut().push(token);
+                        } else {
+                            let s = format!("url({})",
+                                state.borrow_mut().defer(
+                                    DeferralKind::QuotedUrl,
+                                    s.to_string()
+                                )
+                            );
+                            state.borrow_mut().pushstr(s.as_str());
+                        }
                     },
                     Token::UnquotedUrl(e) => {
                         let s = format!("url({})",
                             state.borrow_mut().defer(
-                                DeferralKind::Image,
+                                DeferralKind::UnquotedUrl,
                                 e.to_string()
                             )
                         );
                         state.borrow_mut().pushstr(s.as_str());
                     },
-                    Token::Function(_) |
+                    Token::Function(s) => {
+                        let is_url = s.to_string().to_lowercase() == "url";
+                        _do_block(is_url, token.clone(), state, parser);
+                    },
                     Token::ParenthesisBlock |
                     Token::SquareBracketBlock |
                     Token::CurlyBracketBlock => {
-                        state.borrow_mut().push(&token);
-                        let tc = token.clone(); // WHYYYYY
-
-                        match parser.parse_nested_block(
-                            |p| _rewrite_css(state, p)
-                        ) {
-                            Ok(s) => {},
-                            Err(_) => break,
-                        }
-                        state.borrow_mut().pushstr(
-                            match tc {
-                                Token::Function(_) => ")",
-                                Token::ParenthesisBlock => ")",
-                                Token::SquareBracketBlock => "}",
-                                _ => "}"
-                            }
-                        );
+                        _do_block(false, token.clone(), state, parser);
                     },
                     _ => state.borrow_mut().push(token)
                 };
             },
-            Err(e) => {
+            Err(_) => {
                 break;
             }
         };
@@ -161,7 +143,7 @@ pub fn rewrite_css(css: &str)
         }
     );
 
-    match _rewrite_css(&state, &mut parser) {
+    match _rewrite_css(false, &state, &mut parser) {
         Ok(_) => {
             let state_ = state.into_inner();
             Ok(Output {
