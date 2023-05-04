@@ -4,12 +4,6 @@ use std::cell::RefCell;
 use lol_html::{element, Settings};
 
 
-const PERMITTED_HTML_TAGS_: &str = "link html head style body a abbr acronym address area b bdo big blockquote br button caption center cite code col colgroup dd del dfn dir div dl dt em fieldset font form h1 h2 h3 h4 h5 h6 hr i img input ins kbd label legend li map menu ol optgroup option p pre q s samp select small span strike strong sub sup table tbody td textarea tfoot th thead u tr tt u ul var";
-
-
-const PERMITTED_HTML_ATTRS_: &str = "align alt aria-hidden aria-label bgcolor border cellpadding cellspacing class color colspan dir height hspace id lang rel href role src style type valign vspace width background";
-
-
 #[derive(Debug)]
 pub enum DeferralKind {
     StyleLink,
@@ -37,11 +31,27 @@ pub struct Output {
 
 lazy_static! {
     static ref PERMITTED_HTML_TAGS: HashSet<&'static str> = {
-        HashSet::from_iter(PERMITTED_HTML_TAGS_.split(' '))
+        HashSet::from_iter([
+            "link", "html", "head", "style", "body", "a", "abbr", "acronym",
+            "address", "area", "b", "bdo", "big", "blockquote", "br",
+            "button", "caption", "center", "cite", "code", "col", "colgroup",
+            "dd", "del", "dfn", "dir", "div", "dl", "dt", "em", "fieldset",
+            "font", "form", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i",
+            "img", "input", "ins", "kbd", "label", "legend", "li", "map",
+            "menu", "ol", "optgroup", "option", "p", "pre", "q", "s", "samp",
+            "select", "small", "span", "strike", "strong", "sub", "sup",
+            "table", "tbody", "td", "textarea", "tfoot", "th", "thead", "u",
+            "tr", "tt", "u", "ul", "var",
+        ])
     };
 
     static ref PERMITTED_HTML_ATTRS: HashSet<&'static str> = {
-        HashSet::from_iter(PERMITTED_HTML_ATTRS_.split(' '))
+        HashSet::from_iter([
+            "align", "alt", "aria-hidden", "aria-label", "bgcolor", "border",
+            "cellpadding", "cellspacing", "class", "color", "colspan", "dir",
+            "height", "hspace", "id", "lang", "rel", "href", "role", "src",
+            "style", "type", "valign", "vspace", "width", "background",
+        ])
     };
 }
 
