@@ -1,6 +1,13 @@
-use cssparser::{CowRcStr, Parser, ParseError, ParserInput, ToCss, Token};
+use cssparser::{Parser, ParseError, ParserInput, ToCss, Token};
+use std::collections::HashSet;
 use std::cell::RefCell;
 
+
+enum ParseState {
+    Basic,
+    Nested,
+    UrlFunction
+}
 
 pub enum DeferralKind {
     Import,
@@ -19,49 +26,97 @@ pub struct Output {
     pub deferrals: Vec<Deferral>
 }
 
+struct State {
+    state: ParseState,
+    output: String,
+    deferrals: Vec<Deferral>,
+}
 
-fn _rewrite_css<'a>(start: Option<&Token>,
-                    deferrals: &RefCell<Vec<Deferral>>,
-                    parser: &mut Parser)
-    -> Result<String, ParseError<'a, String>>
-{
-    let output = RefCell::new(String::new());
+impl State {
+    fn pushstr(&mut self, s: &str) {
+        self.output.push_str(s);
+    }
 
-    let pushstr = |s: &str| output.borrow_mut().push_str(s);
-    let push = |tok: &Token| pushstr(tok.to_css_string().as_str());
+    fn push(&mut self, token: &Token) {
+        self.pushstr(&token.to_css_string());
+    }
 
-    let defer = |kind, data| {
-        let mut d = deferrals.borrow_mut();
-        let i = d.len();
+    fn defer(&mut self, kind: DeferralKind, data: String) -> String {
+        let i = self.deferrals.len();
         let s = match &kind {
             DeferralKind::Import => "Import",
             DeferralKind::Font => "Font",
             DeferralKind::Image => "Image",
         };
 
-        d.push(Deferral {kind: kind, i: i, data: data});
-        format!("/*DEFER:{}:{}*/", s, i)
-    };
+        self.deferrals.push(Deferral {
+            kind: kind,
+            i: i,
+            data: data
+        });
 
+        format!("/*DEFER:{}:{}*/", s, i)
+    }
+}
+
+
+lazy_static! {
+    static ref CSS_PROPS_WITH_IMAGE_URLS: HashSet<&'static str> = {
+        HashSet::from_iter([
+            // Universal
+            "background",
+            "background-image",
+            "border-image",
+            "border-image-source",
+            "content",
+            "cursor",
+            "list-style",
+            "list-style-image",
+            "mask",
+            "mask-image",
+            // Specific to @counter-style
+            "additive-symbols",
+            "negative",
+            "pad",
+            "prefix",
+            "suffix",
+            "symbols",
+        ])
+    };
+}
+
+
+pub fn is_image_url_prop(prop: &str) -> bool {
+    let lower = prop.to_lowercase();
+    CSS_PROPS_WITH_IMAGE_URLS.contains(lower.as_str())
+}
+
+
+fn _rewrite_css<'a>(state: &RefCell<State>, parser: &mut Parser)
+    -> Result<(), ParseError<'a, String>>
+{
     let ws = Token::WhiteSpace(" ");
 
+    // https://github.com/Y2Z/monolith/blob/master/src/css.rs#L131
     loop {
         let t = parser.next_including_whitespace();
         match t {
             Ok(token) => {
                 //let t2 = token.clone();
+                println!("TOKEN {:?}", token);
                 match token {
                     Token::WhiteSpace(_) => {
-                        push(&ws);
+                        state.borrow_mut().push(&ws);
                         continue;
                     },
                     Token::UnquotedUrl(e) => {
-                        push(
-                            &(Token::UnquotedUrl(CowRcStr::from(
-                                defer(DeferralKind::Image, e.to_string())
-                                .as_str()
-                            )))
+                        let s = format!("url({})",
+                            state.borrow_mut().defer(
+                                DeferralKind::Image,
+                                e.to_string()
+                            )
                         );
+                        state.borrow_mut().pushstr(s.as_str());
                         continue;
                     },
                     Token::Function(_) |
@@ -69,14 +124,14 @@ fn _rewrite_css<'a>(start: Option<&Token>,
                     Token::SquareBracketBlock |
                     Token::CurlyBracketBlock => {
                         let tc = token.clone();
-                        push(&tc); // WHYYYYY
+                        state.borrow_mut().push(&tc); // WHYYYYY
                         match parser.parse_nested_block(
-                            |p| _rewrite_css(Some(&tc), deferrals, p)
+                            |p| _rewrite_css(state, p)
                         ) {
-                            Ok(s) => pushstr(s.as_str()),
+                            Ok(s) => {},
                             Err(_) => break,
                         }
-                        pushstr(match tc {
+                        state.borrow_mut().pushstr(match tc {
                             Token::Function(_) => ")",
                             Token::ParenthesisBlock => ")",
                             Token::SquareBracketBlock => "}",
@@ -87,7 +142,7 @@ fn _rewrite_css<'a>(start: Option<&Token>,
                     _ => {},
                 };
                 //println!("EEK {:?}", token);
-                push(token);
+                state.borrow_mut().push(token);
             },
             Err(_) => {
                 //println!("DOINK {:?}", e);
@@ -96,22 +151,32 @@ fn _rewrite_css<'a>(start: Option<&Token>,
         };
     }
 
-    Ok(output.into_inner())
+    Ok(())
 }
 
 
 pub fn rewrite_css(css: &str)
     -> Result<Output, ParseError<String>>
 {
+    let state = RefCell::new(
+        State {
+            state: ParseState::Basic,
+            output: String::new(),
+            deferrals: Vec::new(),
+        }
+    );
+
     let mut input = ParserInput::new(css);
     let mut parser = Parser::new(&mut input);
-    let mut deferrals = RefCell::new(Vec::new());
 
-    match _rewrite_css(None, &deferrals, &mut parser) {
-        Ok(css) => return Ok(Output {
-            css: css,
-            deferrals: deferrals.into_inner(),
-        }),
+    match _rewrite_css(&state, &mut parser) {
+        Ok(_) => {
+            let state_ = state.into_inner();
+            return Ok(Output {
+                css: state_.output,
+                deferrals: state_.deferrals,
+            })
+        },
         Err(e) => return Err(e),
     }
 }
