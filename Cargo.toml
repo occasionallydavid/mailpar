@@ -8,10 +8,16 @@ edition = "2021"
 name = "mailpar"
 crate-type = ["cdylib"]
 
+[profile.release]
+# lto = true
+strip = true
+# codegen-units = 1
+panic = "abort"
+# opt-level = "z"  # Optimize for size.
+
 [dependencies]
 cssparser = "0.31.0"
 html-escape = "0.2.13"
-htmlize = "1.0.2"
 lazy_static = "1.4.0"
 lol_html = "0.4.0"
 mailparse = "0.13.8"

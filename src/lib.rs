@@ -322,7 +322,21 @@ pub fn rewrite_html(py: Python, s: &str) -> PyResult<PyObject>
 #[pyfunction]
 pub fn rewrite_css(py: Python, s: &str) -> PyResult<PyObject>
 {
-    Ok(PyString::new(py, crate::css::rewrite_css(s).as_str()).into())
+    let lst = pyo3::types::PyList::empty(py);
+
+    match crate::css::rewrite_css(s) {
+        Ok(output) => {
+            for deferral in output.deferrals {
+                lst.append((deferral.i, deferral.kind as i32, deferral.data));
+            }
+
+            let dct = pyo3::types::PyDict::new(py);
+            dct.set_item("css", output.css);
+            dct.set_item("deferrals", lst);
+            Ok(dct.into())
+        },
+        Err(_) => panic!(),
+    }
 }
 
 

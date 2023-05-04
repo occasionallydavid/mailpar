@@ -190,16 +190,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "htmlize"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ebaa6fa16c015015edec1041cf720bd43e3fef17ca07d15ae22dca96f7da2ec"
-dependencies = [
- "memchr",
- "paste",
-]
-
-[[package]]
 name = "indoc"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -280,7 +270,6 @@ version = "0.1.0"
 dependencies = [
  "cssparser 0.31.0",
  "html-escape",
- "htmlize",
  "lazy_static",
  "lol_html",
  "mailparse",
@@ -360,12 +349,6 @@ dependencies = [
  "smallvec",
  "windows-sys",
 ]
-
-[[package]]
-name = "paste"
-version = "1.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f746c4065a8fa3fe23974dd82f15431cc8d40779821001404d10d2e79ca7d79"
 
 [[package]]
 name = "phf"
