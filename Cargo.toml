@@ -20,6 +20,6 @@ cssparser = "0.31.0"
 html-escape = "0.2.13"
 lazy_static = "1.4.0"
 lol_html = "0.4.0"
-mailparse = { git = "https://github.com/occasionallydavid/mailparse.git", rev = "8de892fe885e496fe95fbf321a8ca1a35cc5a751" }  #"0.13.8"
+mailparse = { git = "https://github.com/occasionallydavid/mailparse.git", rev = "aa9e65f9bf5fa4a32f705f655e8f70f295c79da8" }  #"0.13.8"
 owning_ref = "0.4.1"
 pyo3 = { version = "0.16.5", features = ["extension-module"] }
