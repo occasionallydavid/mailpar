@@ -269,13 +269,17 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
             }),
 
             element!("*[background]", |elem| {
-                let bg = elem.get_attribute("background").unwrap();
+                let bg = html_escape::decode_html_entities(
+                    elem.get_attribute("background").unwrap().as_str()
+                ).into_owned();
                 elem.set_attribute("background", defer(&mut backgrounds, DeferralKind::Source, bg).as_str());
                 Ok(())
             }),
 
             element!("*[src]", |elem| {
-                let src = elem.get_attribute("src").unwrap();
+                let src = html_escape::decode_html_entities(
+                    elem.get_attribute("src").unwrap().as_str()
+                ).into_owned();
                 elem.set_attribute("src", defer(&mut sources, DeferralKind::Source, src).as_str());
                 Ok(())
             }),
@@ -287,7 +291,6 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
     style_links.append(&mut backgrounds);
     style_links.append(&mut inline_styles);
     style_links.append(&mut style_attrs);
-    println!("{}", st_doctype_removed);
 
     match result {
         Ok(s) => {
