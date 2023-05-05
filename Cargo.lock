@@ -280,7 +280,7 @@ dependencies = [
 [[package]]
 name = "mailparse"
 version = "0.14.0"
-source = "git+https://github.com/occasionallydavid/mailparse.git?rev=8de892fe885e496fe95fbf321a8ca1a35cc5a751#8de892fe885e496fe95fbf321a8ca1a35cc5a751"
+source = "git+https://github.com/occasionallydavid/mailparse.git?rev=aa9e65f9bf5fa4a32f705f655e8f70f295c79da8#aa9e65f9bf5fa4a32f705f655e8f70f295c79da8"
 dependencies = [
  "charset",
  "data-encoding",

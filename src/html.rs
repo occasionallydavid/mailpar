@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::cell::RefCell;
 
 use lol_html::{element, Settings};
+use lol_html::html_content::ContentType;
 
 
 #[derive(Debug)]
@@ -37,6 +38,8 @@ pub struct Output {
     pub st_link_no_href_removed: u32,
     pub st_link_non_http_removed: u32,
     pub st_anchors_rewritten: u32,
+    pub st_inline_style_skipped: u32,
+    pub st_style_attr_skipped: u32,
 }
 
 
@@ -88,6 +91,8 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
     let mut st_link_no_href_removed = 0;
     let mut st_link_non_http_removed = 0;
     let mut st_anchors_rewritten = 0;
+    let mut st_inline_style_skipped = 0;
+    let mut st_style_attr_skipped = 0;
 
     let defer = |d: &mut Vec<Deferral>, kind, data| {
         let i = d.len();
@@ -199,7 +204,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 elem.replace(
                     defer(&mut style_links,
                           DeferralKind::StyleLink, href).as_str(),
-                    lol_html::html_content::ContentType::Html
+                    ContentType::Html
                 );
 
                 Ok(())
@@ -210,34 +215,59 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                     elem.get_attribute("style").unwrap().as_str()
                 ).into_owned();
 
-                elem.set_attribute(
-                    "style",
-                    defer(&mut style_attrs,
-                          DeferralKind::StyleAttr,
-                          data).as_str()
-                );
+                let output = crate::css::rewrite_css(data.as_str()).unwrap();
+                if output.deferrals.len() == 0 {
+                    st_style_attr_skipped += 1;
+                    elem.set_attribute("style", output.css.as_str());
+                } else {
+                    // TODO: preserve CSS deferral work
+                    elem.set_attribute(
+                        "style",
+                        defer(&mut style_attrs,
+                              DeferralKind::StyleAttr,
+                              data).as_str()
+                    );
+                }
 
+                Ok(())
+            }),
+
+            element!("style", |el| {
+                //println!("REMOVING STYLE");
+                el.remove();
                 Ok(())
             }),
 
             // inline styles
             lol_html::text!("style", |text| {
-                if inline_style.len() == 0 {
-                    inline_style += text.as_str();
-                    text.replace(
-                        defer(&mut inline_styles,
-                              DeferralKind::StyleInline, "".to_string()).as_str(),
-                        lol_html::html_content::ContentType::Html
-                    );
-                } else {
-                    inline_style += text.as_str();
+                inline_style += text.as_str();
+
+                if !text.last_in_text_node() {
                     text.remove();
-                    if text.last_in_text_node() {
-                        inline_styles.last_mut().unwrap().data = inline_style.clone();
-                        //println!("WTF {}", inline_style);
-                        inline_style.clear();
-                    }
+                    return Ok(());
                 }
+
+                let output = crate::css::rewrite_css(inline_style.as_str()).unwrap();
+                if output.deferrals.len() == 0 {
+                    let mut x = String::new();
+                    x += "<style>";
+                    x += inline_style.as_str();
+                    x += "</style>";
+                    text.replace(x.as_str(), ContentType::Html);
+                    st_inline_style_skipped += 1;
+                } else {
+                    let mut x = String::new();
+                    x += "<style>";
+                    x += defer(&mut inline_styles,
+                               DeferralKind::StyleInline,
+                               inline_style.clone()).as_str();
+                    x += "</style>";
+                    text.replace(x.as_str(), ContentType::Html);
+                    st_inline_style_skipped += 1;
+                    // TODO: preserve CSS deferral work
+                }
+
+                inline_style.clear();
                 Ok(())
             }),
 
@@ -316,6 +346,8 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 st_link_no_href_removed: st_link_no_href_removed,
                 st_link_non_http_removed: st_link_non_http_removed,
                 st_anchors_rewritten: st_anchors_rewritten,
+                st_inline_style_skipped: st_inline_style_skipped,
+                st_style_attr_skipped: st_style_attr_skipped,
             })
         },
         Err(e) => {

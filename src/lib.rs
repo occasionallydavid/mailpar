@@ -322,6 +322,8 @@ pub fn rewrite_html(py: Python, s: &str) -> PyResult<PyObject>
             dct.set_item("link_no_href_removed", output.st_link_no_href_removed);
             dct.set_item("link_non_http_removed", output.st_link_non_http_removed);
             dct.set_item("anchors_rewritten", output.st_anchors_rewritten);
+            dct.set_item("inline_style_skipped", output.st_inline_style_skipped);
+            dct.set_item("style_attr_skipped", output.st_style_attr_skipped);
 
             Ok(dct.into())
             //Ok((output.html, lst).into(py))
