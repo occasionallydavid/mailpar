@@ -311,6 +311,18 @@ pub fn rewrite_html(py: Python, s: &str) -> PyResult<PyObject>
             dct.set_item("page_links", output.page_links);
             dct.set_item("text_content", output.text_content);
             dct.set_item("deferrals", lst);
+
+            dct.set_item("doctype_removed", output.st_doctype_removed);
+            dct.set_item("comment_removed", output.st_comment_removed);
+            dct.set_item("script_removed", output.st_script_removed);
+            dct.set_item("invalid_tag_removed", output.st_invalid_tag_removed);
+            dct.set_item("invalid_attr_removed", output.st_invalid_attr_removed);
+            dct.set_item("link_no_rel_removed", output.st_link_no_rel_removed);
+            dct.set_item("link_non_stylesheet_removed", output.st_link_non_stylesheet_removed);
+            dct.set_item("link_no_href_removed", output.st_link_no_href_removed);
+            dct.set_item("link_non_http_removed", output.st_link_non_http_removed);
+            dct.set_item("anchors_rewritten", output.st_anchors_rewritten);
+
             Ok(dct.into())
             //Ok((output.html, lst).into(py))
         },

@@ -25,7 +25,18 @@ pub struct Output {
     pub html: String,
     pub text_content: String,
     pub page_links: Vec<String>,
-    pub deferrals: Vec<Deferral>
+    pub deferrals: Vec<Deferral>,
+
+    pub st_doctype_removed: u32,
+    pub st_comment_removed: u32,
+    pub st_script_removed: u32,
+    pub st_invalid_tag_removed: u32,
+    pub st_invalid_attr_removed: u32,
+    pub st_link_no_rel_removed: u32,
+    pub st_link_non_stylesheet_removed: u32,
+    pub st_link_no_href_removed: u32,
+    pub st_link_non_http_removed: u32,
+    pub st_anchors_rewritten: u32,
 }
 
 
@@ -67,6 +78,17 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
     let text_content = RefCell::new(String::new());
     let mut page_links = Vec::new();
 
+    let mut st_doctype_removed = 0;
+    let mut st_comment_removed = 0;
+    let mut st_script_removed = 0;
+    let mut st_invalid_tag_removed = 0;
+    let mut st_invalid_attr_removed = 0;
+    let mut st_link_no_rel_removed = 0;
+    let mut st_link_non_stylesheet_removed = 0;
+    let mut st_link_no_href_removed = 0;
+    let mut st_link_non_http_removed = 0;
+    let mut st_anchors_rewritten = 0;
+
     let defer = |d: &mut Vec<Deferral>, kind, data| {
         let i = d.len();
         let s = match &kind {
@@ -91,12 +113,14 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
             // Remove DOCTYPE
             lol_html::doctype!(|dt| {
                 dt.remove();
+                st_doctype_removed += 1;
                 Ok(())
             }),
 
             // Remove all comments
             lol_html::doc_comments!(|comment| {
                 comment.remove();
+                st_comment_removed += 1;
                 Ok(())
             }),
         ],
@@ -105,6 +129,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
             // Strip scripts
             element!("script", |elem| {
                 elem.remove();
+                st_script_removed += 1;
                 Ok(())
             }),
 
@@ -113,6 +138,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 if !PERMITTED_HTML_TAGS.contains(elem.tag_name().as_str()) {
                     //println!("REMOVE BAD TAG: {}", elem.tag_name());
                     elem.remove_and_keep_content();
+                    st_invalid_tag_removed += 1;
                     return Ok(());
                 }
 
@@ -127,6 +153,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 for name in v {
                     //println!("REMOVE BAD ATTR: {}", name);
                     elem.remove_attribute(name.as_str());
+                    st_invalid_attr_removed += 1;
                 }
 
                 Ok(())
@@ -138,12 +165,14 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                     None => {
                         //println!("drop <link> with no rel");
                         elem.remove();
+                        st_link_no_rel_removed += 1;
                         return Ok(());
                     },
                     Some(rel) => {
                         if !rel.eq_ignore_ascii_case("stylesheet") {
                             //println!("drop non-style <link>: rel={}", rel);
                             elem.remove();
+                            st_link_non_stylesheet_removed += 1;
                             return Ok(());
                         }
                     }
@@ -153,12 +182,14 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                     None => {
                         //println!("drop <link> with no href");
                         elem.remove();
+                        st_link_no_href_removed += 1;
                         return Ok(());
                     },
                     Some(href) => {
                         if !href.starts_with("http") {
                             //println!("drop non-http <link>: href={}", href);
                             elem.remove();
+                            st_link_non_http_removed += 1;
                             return Ok(());
                         }
                         href
@@ -178,9 +209,6 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 let data = html_escape::decode_html_entities(
                     elem.get_attribute("style").unwrap().as_str()
                 ).into_owned();
-                //let data = htmlize::unescape(
-                    //elem.get_attribute("style").unwrap().as_str()
-                //).into_owned();
 
                 elem.set_attribute(
                     "style",
@@ -259,6 +287,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
     style_links.append(&mut backgrounds);
     style_links.append(&mut inline_styles);
     style_links.append(&mut style_attrs);
+    println!("{}", st_doctype_removed);
 
     match result {
         Ok(s) => {
@@ -273,6 +302,17 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 text_content: text,
                 page_links: page_links,
                 deferrals: style_links,
+
+                st_doctype_removed: st_doctype_removed,
+                st_comment_removed: st_comment_removed,
+                st_script_removed: st_script_removed,
+                st_invalid_tag_removed: st_invalid_tag_removed,
+                st_invalid_attr_removed: st_invalid_attr_removed,
+                st_link_no_rel_removed: st_link_no_rel_removed,
+                st_link_non_stylesheet_removed: st_link_non_stylesheet_removed,
+                st_link_no_href_removed: st_link_no_href_removed,
+                st_link_non_http_removed: st_link_non_http_removed,
+                st_anchors_rewritten: st_anchors_rewritten,
             })
         },
         Err(e) => {
