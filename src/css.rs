@@ -1,22 +1,14 @@
 use cssparser::{Parser, ParseError, ParserInput, ToCss, Token};
 use std::cell::RefCell;
 
+use crate::deferral::DeferralKind;
+use crate::deferral::Deferral;
+
 
 enum ParseState {
     Basic,
     Nested,
     UrlFunction
-}
-
-pub enum DeferralKind {
-    UnquotedUrl,
-    QuotedUrl,
-}
-
-pub struct Deferral {
-    pub kind: DeferralKind,
-    pub i: usize,
-    pub data: String
 }
 
 pub struct Output {
@@ -41,10 +33,7 @@ impl State {
 
     fn defer(&mut self, kind: DeferralKind, data: String) -> String {
         let i = self.deferrals.len();
-        let s = match &kind {
-            DeferralKind::QuotedUrl => "QuotedUrl",
-            DeferralKind::UnquotedUrl => "UnquotedUrl",
-        };
+        let s = kind.as_str();
 
         self.deferrals.push(Deferral {
             kind: kind,

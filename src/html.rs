@@ -4,23 +4,9 @@ use std::cell::RefCell;
 use lol_html::{element, Settings};
 use lol_html::html_content::ContentType;
 
-
-#[derive(Debug)]
-pub enum DeferralKind {
-    StyleLink,
-    StyleInline,
-    StyleAttr,
-    Source,
-    ImageLink,
-}
-
-
-pub struct Deferral {
-    pub kind: DeferralKind,
-    pub i: usize,
-    pub data: String
-}
-
+use crate::css::rewrite_css;
+use crate::deferral::DeferralKind;
+use crate::deferral::Deferral;
 
 pub struct Output {
     pub html: String,
@@ -94,15 +80,9 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
     let mut st_inline_style_skipped = 0;
     let mut st_style_attr_skipped = 0;
 
-    let defer = |d: &mut Vec<Deferral>, kind, data| {
+    let defer = |d: &mut Vec<Deferral>, kind: DeferralKind, data| {
         let i = d.len();
-        let s = match &kind {
-            DeferralKind::StyleLink => "StyleLink",
-            DeferralKind::StyleInline => "StyleInline",
-            DeferralKind::StyleAttr => "StyleAttr",
-            DeferralKind::Source => "Source",
-            DeferralKind::ImageLink => "ImageLink",
-        };
+        let s = kind.as_str();
 
         d.push(Deferral {
             kind: kind,
@@ -215,7 +195,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                     elem.get_attribute("style").unwrap().as_str()
                 ).into_owned();
 
-                let output = crate::css::rewrite_css(data.as_str()).unwrap();
+                let output = rewrite_css(data.as_str()).unwrap();
                 if output.deferrals.len() == 0 {
                     st_style_attr_skipped += 1;
                     elem.set_attribute("style", output.css.as_str());
@@ -247,7 +227,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                     return Ok(());
                 }
 
-                let output = crate::css::rewrite_css(inline_style.as_str()).unwrap();
+                let output = rewrite_css(inline_style.as_str()).unwrap();
                 if output.deferrals.len() == 0 {
                     let mut x = String::new();
                     x += "<style>";

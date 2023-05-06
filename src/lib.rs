@@ -25,6 +25,7 @@ use mailparse;
 
 pub mod html;
 pub mod css;
+pub mod deferral;
 
 
 create_exception!(mailpar, ParseError, PyException);
