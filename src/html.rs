@@ -42,6 +42,9 @@ lazy_static! {
             "select", "small", "span", "strike", "strong", "sub", "sup",
             "table", "tbody", "td", "textarea", "tfoot", "th", "thead", "u",
             "tr", "tt", "u", "ul", "var",
+
+            // https://www.emailonacid.com/blog/article/email-development/image-map-support-in-html-email/ ; used by some spam
+            "area", "map",
         ])
     };
 
@@ -51,6 +54,9 @@ lazy_static! {
             "cellpadding", "cellspacing", "class", "color", "colspan", "dir",
             "height", "hspace", "id", "lang", "rel", "href", "role", "src",
             "style", "type", "valign", "vspace", "width", "background",
+
+            // for <area>
+            "usemap", "name", "shape", "coords",
         ])
     };
 }
@@ -246,7 +252,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 Ok(())
             }),
 
-            element!("a[href]", |elem| {
+            element!("area[href], a[href]", |elem| {
                 elem.set_attribute("target", "_blank")?;
                 elem.set_attribute("rel", "noopener noreferrer")?;
                 page_links.push(
