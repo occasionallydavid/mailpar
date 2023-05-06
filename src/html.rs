@@ -195,19 +195,10 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                     elem.get_attribute("style").unwrap().as_str()
                 ).into_owned();
 
-                let output = rewrite_css(data.as_str()).unwrap();
-                if output.deferrals.len() == 0 {
-                    st_style_attr_skipped += 1;
-                    elem.set_attribute("style", output.css.as_str());
-                } else {
-                    // TODO: preserve CSS deferral work
-                    elem.set_attribute(
-                        "style",
-                        defer(&mut style_attrs,
-                              DeferralKind::StyleAttr,
-                              data).as_str()
-                    );
-                }
+                // TODO escaping
+                let mut output = rewrite_css(data.as_str()).unwrap();
+                elem.set_attribute("style", output.css.as_str());
+                style_attrs.append(&mut output.deferrals);
 
                 Ok(())
             }),
@@ -227,25 +218,13 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                     return Ok(());
                 }
 
-                let output = rewrite_css(inline_style.as_str()).unwrap();
-                if output.deferrals.len() == 0 {
-                    let mut x = String::new();
-                    x += "<style>";
-                    x += inline_style.as_str();
-                    x += "</style>";
-                    text.replace(x.as_str(), ContentType::Html);
-                    st_inline_style_skipped += 1;
-                } else {
-                    let mut x = String::new();
-                    x += "<style>";
-                    x += defer(&mut inline_styles,
-                               DeferralKind::StyleInline,
-                               inline_style.clone()).as_str();
-                    x += "</style>";
-                    text.replace(x.as_str(), ContentType::Html);
-                    st_inline_style_skipped += 1;
-                    // TODO: preserve CSS deferral work
-                }
+                let mut output = rewrite_css(inline_style.as_str()).unwrap();
+                let mut x = String::new();
+                x += "<style>";
+                x += output.css.as_str();
+                x += "</style>";
+                text.replace(x.as_str(), ContentType::Html);
+                inline_styles.append(&mut output.deferrals);
 
                 inline_style.clear();
                 Ok(())

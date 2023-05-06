@@ -79,11 +79,9 @@ fn _rewrite_css<'a>(in_url: bool, state: &RefCell<State>, parser: &mut Parser)
                         if !in_url {
                             state.borrow_mut().push(token);
                         } else {
-                            let s = format!("url({})",
-                                state.borrow_mut().defer(
-                                    DeferralKind::QuotedUrl,
-                                    s.to_string()
-                                )
+                            let s = state.borrow_mut().defer(
+                                DeferralKind::QuotedUrl,
+                                s.to_string()
                             );
                             state.borrow_mut().pushstr(s.as_str());
                         }
