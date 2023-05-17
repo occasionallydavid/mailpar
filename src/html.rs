@@ -114,6 +114,12 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
         ],
 
         element_content_handlers: vec![
+            // Strip <title>
+            element!("title", |elem| {
+                elem.remove();
+                Ok(())
+            }),
+
             // Strip scripts
             element!("script", |elem| {
                 elem.remove();
