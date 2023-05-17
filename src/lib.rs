@@ -339,7 +339,7 @@ pub fn rewrite_css(py: Python, s: &str) -> PyResult<PyObject>
 {
     let lst = pyo3::types::PyList::empty(py);
 
-    match crate::css::rewrite_css(s) {
+    match crate::css::rewrite_css(s, 0) {
         Ok(output) => {
             for deferral in output.deferrals {
                 lst.append((deferral.i, deferral.kind as i32, deferral.data));

@@ -20,6 +20,7 @@ struct State {
     state: ParseState,
     output: String,
     deferrals: Vec<Deferral>,
+    offset: usize,
 }
 
 impl State {
@@ -37,11 +38,11 @@ impl State {
 
         self.deferrals.push(Deferral {
             kind: kind,
-            i: i,
+            i: i + self.offset,
             data: data
         });
 
-        format!("/*DEFER:{}:{}*/", s, i)
+        format!("/*DEFER:{}:{}*/", s, i+self.offset)
     }
 }
 
@@ -117,7 +118,7 @@ fn _rewrite_css<'a>(in_url: bool, state: &RefCell<State>, parser: &mut Parser)
 }
 
 
-pub fn rewrite_css(css: &str)
+pub fn rewrite_css(css: &str, offset: usize)
     -> Result<Output, ParseError<String>>
 {
     let mut input = ParserInput::new(css);
@@ -127,6 +128,7 @@ pub fn rewrite_css(css: &str)
             state: ParseState::Basic,
             output: String::new(),
             deferrals: Vec::new(),
+            offset: offset,
         }
     );
 

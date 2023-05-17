@@ -3,6 +3,7 @@ use std::cell::RefCell;
 
 use lol_html::{element, Settings};
 use lol_html::html_content::ContentType;
+use lol_html::html_content::TextType;
 
 use crate::css::rewrite_css;
 use crate::deferral::DeferralKind;
@@ -63,11 +64,7 @@ lazy_static! {
 
 
 pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError> {
-    let mut style_links = Vec::new();
-    let mut style_attrs = Vec::new();
-    let mut sources = Vec::new();
-    let mut backgrounds = Vec::new();
-    let mut inline_styles = Vec::new();
+    let mut deferrals = RefCell::new(Vec::new());
 
     let mut inline_style = String::new();
     let text_content = RefCell::new(String::new());
@@ -188,7 +185,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 };
 
                 elem.replace(
-                    defer(&mut style_links,
+                    defer(&mut deferrals.borrow_mut(),
                           DeferralKind::StyleLink, href).as_str(),
                     ContentType::Html
                 );
@@ -202,9 +199,9 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 ).into_owned();
 
                 // TODO escaping
-                let mut output = rewrite_css(data.as_str()).unwrap();
+                let mut output = rewrite_css(data.as_str(), deferrals.borrow().len()).unwrap();
                 elem.set_attribute("style", output.css.as_str());
-                style_attrs.append(&mut output.deferrals);
+                deferrals.borrow_mut().append(&mut output.deferrals);
 
                 Ok(())
             }),
@@ -224,13 +221,13 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                     return Ok(());
                 }
 
-                let mut output = rewrite_css(inline_style.as_str()).unwrap();
+                let mut output = rewrite_css(inline_style.as_str(), deferrals.borrow().len()).unwrap();
                 let mut x = String::new();
                 x += "<style>";
                 x += output.css.as_str();
                 x += "</style>";
                 text.replace(x.as_str(), ContentType::Html);
-                inline_styles.append(&mut output.deferrals);
+                deferrals.borrow_mut().append(&mut output.deferrals);
 
                 inline_style.clear();
                 Ok(())
@@ -242,11 +239,16 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
             }),
 
             lol_html::text!("*", |text| {
-                if text.text_type() == lol_html::html_content::TextType::Data && !text.removed() {
-                    let s = text.as_str().trim();
-                    if s.len() > 0 {
-                        (*text_content.borrow_mut()) += s;
-                        (*text_content.borrow_mut()) += " ";
+                if text.text_type() == TextType::Data && !text.removed() {
+                    let as_str = text.as_str();
+                    if as_str.len() > 0 {
+                        let s = as_str.trim();
+                        if s.len() > 0 {
+                            (*text_content.borrow_mut()) += s;
+                            (*text_content.borrow_mut()) += " ";
+                        } else {
+                            text.replace(" ", ContentType::Html);
+                        }
                     }
                 }
                 Ok(())
@@ -267,7 +269,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 let bg = html_escape::decode_html_entities(
                     elem.get_attribute("background").unwrap().as_str()
                 ).into_owned();
-                elem.set_attribute("background", defer(&mut backgrounds, DeferralKind::Source, bg).as_str());
+                elem.set_attribute("background", defer(&mut deferrals.borrow_mut(), DeferralKind::Source, bg).as_str());
                 Ok(())
             }),
 
@@ -275,17 +277,12 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 let src = html_escape::decode_html_entities(
                     elem.get_attribute("src").unwrap().as_str()
                 ).into_owned();
-                elem.set_attribute("src", defer(&mut sources, DeferralKind::Source, src).as_str());
+                elem.set_attribute("src", defer(&mut deferrals.borrow_mut(), DeferralKind::Source, src).as_str());
                 Ok(())
             }),
         ],
         ..Settings::default()
     });
-
-    style_links.append(&mut sources);
-    style_links.append(&mut backgrounds);
-    style_links.append(&mut inline_styles);
-    style_links.append(&mut style_attrs);
 
     match result {
         Ok(s) => {
@@ -299,7 +296,7 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 html: s,
                 text_content: text,
                 page_links: page_links,
-                deferrals: style_links,
+                deferrals: deferrals.into_inner(),
 
                 st_doctype_removed: st_doctype_removed,
                 st_comment_removed: st_comment_removed,
