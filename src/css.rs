@@ -76,6 +76,13 @@ fn _rewrite_css<'a>(in_url: bool, state: &RefCell<State>, parser: &mut Parser)
             Ok(token) => {
                 //println!("TOKEN {:?}", token);
                 match token {
+                    Token::Ident(s) => {
+                        if s.eq_ignore_ascii_case("head") ||
+                           s.eq_ignore_ascii_case("body") {
+                            state.borrow_mut().pushstr("x-");
+                        }
+                        state.borrow_mut().pushstr(s);
+                    }
                     Token::QuotedString(s) => {
                         if !in_url {
                             state.borrow_mut().push(token);

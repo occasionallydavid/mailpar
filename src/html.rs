@@ -153,6 +153,32 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
                 Ok(())
             }),
 
+            // rewrite HEAD and BODY to X-HEAD and X-BODY
+            element!("head", |elem| {
+                elem.remove_and_keep_content();
+                Ok(())
+            }),
+
+            element!("body", |elem| {
+                elem.set_tag_name("x-body");
+                match elem.get_attribute("style") {
+                    None => {
+                        elem.set_attribute(
+                            "style",
+                            "display: block; margin: 10px;"
+                        );
+                    },
+                    Some(s) => {
+                        let mut ns = String::from(
+                            "display: block; margin: 10px;"
+                        );
+                        ns.push_str(&s);
+                        elem.set_attribute("style", ns.as_str());
+                    }
+                };
+                Ok(())
+            }),
+
             // transform_link()
             element!("link", |elem| {
                 match elem.get_attribute("rel") {
@@ -214,7 +240,8 @@ pub fn rewrite_html(s: &str) -> Result<Output, lol_html::errors::RewritingError>
 
             element!("style", |el| {
                 //println!("REMOVING STYLE");
-                el.remove();
+                el.remove_and_keep_content();
+                //el.remove();
                 Ok(())
             }),
 
