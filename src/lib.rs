@@ -76,6 +76,20 @@ impl PyHeaders {
         headers.get_raw_bytes()
     }
 
+    fn fromline(&self) -> Option<&[u8]> {
+        let pm = _hpart(self);
+        if pm.headers.len() == 0 {
+            return None;
+        }
+
+        let key = pm.headers[0].get_key_raw();
+        if key.starts_with(b"From ") {
+            return Some(key);
+        }
+
+        None
+    }
+
     fn first(&self, key: &str) -> Option<String> {
         let headers = _hpart(self).get_headers();
         headers.get_first_value(key)
@@ -113,6 +127,17 @@ impl PyHeaders {
     fn all(&self, key: &str) -> Vec<String> {
         let headers = _hpart(self).get_headers();
         headers.get_all_values(key)
+    }
+
+    fn names(&self, py: Python) -> PyResult<PyObject> {
+        let lst = pyo3::types::PyList::empty(py);
+
+        let headers = _hpart(self).get_headers();
+        for header in headers {
+            lst.append(header.get_key());
+        }
+
+        Ok(lst.into())
     }
 }
 
