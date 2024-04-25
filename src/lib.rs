@@ -45,7 +45,8 @@ struct MailStorage {
                 mailparse::MailParseError
             >
         >
-    >
+    >,
+    from_line: Box<Vec<u8>>
 }
 
 
@@ -179,6 +180,10 @@ impl PyParsedMail {
         return [slice_offset(handle.as_owner().as_slice(), sl), sl.len()];
     }
 
+    fn from_line(&self, py: Python) -> PyObject {
+        PyBytes::new(py, (*self.storage.from_line).as_slice()).into()
+    }
+
     fn raw_bytes(&self, py: Python) -> PyObject {
         PyBytes::new(py, _part(self).raw_bytes).into()
     }
@@ -294,11 +299,26 @@ fn _subpath(path: &Vec<usize>, i: usize) -> Vec<usize> {
 }
 
 
+fn read_off_from_line(buf: &[u8]) -> (&[u8], &[u8])
+{
+    if !buf.starts_with("From ".as_bytes()) {
+        return (&[], buf);
+    }
+
+    match buf.iter().position(|&b| b == b'\n') {
+        Some(i) => (&buf[..i+1], &buf[i+1..]),
+        None => (&[], buf)
+    }
+}
+
+
 #[pyfunction]
 fn from_bytes<'a>(_py: Python<'a>, buf: &[u8]) -> PyResult<PyParsedMail>
 {
+    let (header_buf, body_buf) = read_off_from_line(buf);
+
     let handle = OwningHandle::new_with_fn(
-        Box::new(buf.to_vec()),
+        Box::new(body_buf.to_vec()),
         unsafe {
             |x| Box::new(mailparse::parse_mail((*x).as_slice()))
         }
@@ -310,6 +330,7 @@ fn from_bytes<'a>(_py: Python<'a>, buf: &[u8]) -> PyResult<PyParsedMail>
                 storage: Rc::new(
                     MailStorage {
                         handle: handle,
+                        from_line: Box::new(header_buf.to_vec())
                     }
                 ),
                 path: vec![]
